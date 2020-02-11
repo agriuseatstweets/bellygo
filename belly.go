@@ -134,12 +134,13 @@ type Config struct {
 	Location string `env:"BELLY_LOCATION,required"`
 	KafkaBrokers string `env:"KAFKA_BROKERS,required"`
 	Topic string `env:"BELLY_TOPIC,required"`
+	Group string `env:"BELLY_GROUP,required"`
 }
 
 func getConfig() Config {
 	cfg := Config{}
 	if err := env.Parse(&cfg); err != nil {
-		fmt.Printf("%+v\n", err)
+		panic(err)
 	}
 	return cfg
 }
@@ -152,7 +153,7 @@ func main() {
 
 	errs := make(chan error)
 	go monitor(errs)
-	c := NewKafkaConsumer(cnf.Topic, cnf.KafkaBrokers)
+	c := NewKafkaConsumer(cnf.Topic, cnf.KafkaBrokers, cnf.Group)
 	tweets := c.Consume(cnf.Size, errs)
 
 	WriteTweets(bkt, tweets)

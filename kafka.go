@@ -10,11 +10,11 @@ type KafkaConsumer struct {
 }
 
 
-func NewKafkaConsumer(topic string, brokers string) KafkaConsumer {
+func NewKafkaConsumer(topic string, brokers string, group string) KafkaConsumer {
 
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": brokers,
-		"group.id":          "bellygo",
+		"group.id":          group,
 		"auto.offset.reset": "earliest",
 		"enable.auto.commit": "false",
 		"max.poll.interval.ms": "960000",
