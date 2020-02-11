@@ -1,13 +1,13 @@
 package main
 
 import (
-	"time"
 	"log"
 	"fmt"
 	"sync"
 	"compress/gzip"
 	"context"
 	"github.com/caarlos0/env/v6"
+	"github.com/segmentio/ksuid"
 	"cloud.google.com/go/storage"
 )
 
@@ -65,8 +65,8 @@ func (t *TweetWriter) Close() error {
 }
 
 func NewTweetWriteChan(bkt *storage.BucketHandle, date string) *TweetWriteChan {
-	timestamp := time.Now().Format(time.RFC3339)
-	object := fmt.Sprintf("datestamp=%v/%v.json.gz", date, timestamp)
+	filename := ksuid.New()
+	object := fmt.Sprintf("datestamp=%v/%v.json.gz", date, filename)
 	gc := bkt.Object(object).NewWriter(context.Background())
 	gz := gzip.NewWriter(gc)
 

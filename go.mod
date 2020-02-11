@@ -7,4 +7,5 @@ require (
 	github.com/caarlos0/env/v6 v6.1.0
 	github.com/confluentinc/confluent-kafka-go v1.3.0
 	github.com/dghubble/go-twitter v0.0.0-20190719072343-39e5462e111f
+	github.com/segmentio/ksuid v1.0.2
 )
