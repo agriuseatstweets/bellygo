@@ -4,6 +4,7 @@ import (
 	"log"
 	"fmt"
 	"sync"
+	"time"
 	"compress/gzip"
 	"context"
 	"github.com/caarlos0/env/v6"
@@ -133,6 +134,7 @@ type Config struct {
 	Size int `env:"BELLY_SIZE,required"`
 	Location string `env:"BELLY_LOCATION,required"`
 	KafkaBrokers string `env:"KAFKA_BROKERS,required"`
+	KafkaPollTimeout time.Duration `env:"KAFKA_POLL_TIMEOUT,required"`
 	Topic string `env:"BELLY_TOPIC,required"`
 	Group string `env:"BELLY_GROUP,required"`
 }
@@ -154,7 +156,7 @@ func main() {
 	errs := make(chan error)
 	go monitor(errs)
 	c := NewKafkaConsumer(cnf.Topic, cnf.KafkaBrokers, cnf.Group)
-	tweets := c.Consume(cnf.Size, errs)
+	tweets := c.Consume(cnf.Size, cnf.KafkaPollTimeout, errs)
 
 	WriteTweets(bkt, tweets)
 	tp, err := c.Consumer.Commit()

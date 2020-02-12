@@ -1,6 +1,7 @@
 package main
 
 import (
+	"time"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
@@ -29,7 +30,7 @@ func NewKafkaConsumer(topic string, brokers string, group string) KafkaConsumer 
 	return KafkaConsumer{c}
 }
 
-func (consumer KafkaConsumer) Consume (n int, errs chan error) chan *TweetData {
+func (consumer KafkaConsumer) Consume (n int, timeout time.Duration, errs chan error) chan *TweetData {
 	messages := make(chan *TweetData)
 	c := consumer.Consumer
 
@@ -38,7 +39,7 @@ func (consumer KafkaConsumer) Consume (n int, errs chan error) chan *TweetData {
 		defer close(messages)
 		for i := 1; i <= n; i++ {
 
-			msg, err := c.ReadMessage(-1)
+			msg, err := c.ReadMessage(timeout)
 
 			if err != nil {
 				errs <- err
