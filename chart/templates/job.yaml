@@ -1,0 +1,49 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ include "belly.fullname" . }}
+spec:
+  schedule: "{{ .Values.schedule }}"
+  jobTemplate:
+    spec:
+      completions: {{ .Values.completions }}
+      parallelism: {{ .Values.parallelism }}
+      backoffLimit: {{ .Values.backoffLimit }}
+      template:
+        spec:
+        {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+        {{- end }}
+          restartPolicy: OnFailure
+          containers:
+            - name: {{ .Chart.Name }}
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              env:
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: "/keys/key.json"
+                {{- toYaml .Values.env | nindent 16 }}
+              resources:
+                {{- toYaml .Values.resources | nindent 16 }}
+
+              volumeMounts:
+                - name: keys
+                  mountPath: /keys
+                  readOnly: true
+          volumes:
+            - name: keys
+              secret:
+                secretName: {{ .Values.keySecret }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
