@@ -36,18 +36,18 @@ func merge(cs ...<-chan error) <-chan error {
 }
 
 
-type TweetWriter struct {
+type BellyWriter struct {
 	gz *gzip.Writer
 	gc *storage.Writer
 }
 
-type TweetWriteChan struct {
-	In chan<- *TweetData
+type WriteChan struct {
+	In chan<- *BellyData
 	Errs <-chan error
 }
 
-func (t *TweetWriter) WriteTweet(tweet *TweetData) error {
-	_, err := t.gz.Write(tweet.Bytes)
+func (t *BellyWriter) Write(dat *BellyData) error {
+	_, err := t.gz.Write(dat.Value)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func (t *TweetWriter) WriteTweet(tweet *TweetData) error {
 	return err
 }
 
-func (t *TweetWriter) Close() error {
+func (t *BellyWriter) Close() error {
 	if err := t.gz.Close(); err != nil {
 		return err
 	}
@@ -65,20 +65,20 @@ func (t *TweetWriter) Close() error {
 	return nil
 }
 
-func NewTweetWriteChan(bkt *storage.BucketHandle, date string) *TweetWriteChan {
+func NewWriteChan(bkt *storage.BucketHandle, date string) *WriteChan {
 	filename := ksuid.New()
 	object := fmt.Sprintf("datestamp=%v/%v.json.gz", date, filename)
 	gc := bkt.Object(object).NewWriter(context.Background())
 	gz := gzip.NewWriter(gc)
 
-	inch := make(chan *TweetData)
+	inch := make(chan *BellyData)
 	errs := make(chan error)
-	writer := TweetWriter{gz, gc}
+	writer := BellyWriter{gz, gc}
 
 	go func() {
 		defer close(errs)
-		for tweet := range inch {
-			if err := writer.WriteTweet(tweet); err != nil {
+		for dat := range inch {
+			if err := writer.Write(dat); err != nil {
 				log.Print("Error while writing tweet: \n")
 				log.Println(err)
 				errs <- err
@@ -91,27 +91,22 @@ func NewTweetWriteChan(bkt *storage.BucketHandle, date string) *TweetWriteChan {
 		}
 	}()
 
-	return &TweetWriteChan{inch, errs}
+	return &WriteChan{inch, errs}
 }
 
 
-func WriteTweets(bkt *storage.BucketHandle, tweets chan *TweetData) {
-	writers := make(map[string] *TweetWriteChan)
+func WriteData(bkt *storage.BucketHandle, data chan *BellyData) {
+	writers := make(map[string] *WriteChan)
 
-	for tweet := range tweets {
-		t, err := tweet.Tweet.CreatedAtTime()
-		if err != nil {
-			panic(err)
-		}
-		d := t.Format("2006-01-02")
-		w, ok := writers[d]
+	for d := range data {
+		w, ok := writers[d.Key]
 
 		if ok == false {
-			w = NewTweetWriteChan(bkt, d)
-			writers[d] = w
+			w = NewWriteChan(bkt, d.Key)
+			writers[d.Key] = w
 		}
 
-		w.In <- tweet
+		w.In <- d
 	}
 
 	// close in chans and block
@@ -156,9 +151,9 @@ func main() {
 	errs := make(chan error)
 	go monitor(errs)
 	c := NewKafkaConsumer(cnf.Topic, cnf.KafkaBrokers, cnf.Group)
-	tweets := c.Consume(cnf.Size, cnf.KafkaPollTimeout, errs)
+	data := c.Consume(cnf.Size, cnf.KafkaPollTimeout, errs)
 
-	WriteTweets(bkt, tweets)
+	WriteData(bkt, data)
 	tp, err := c.Consumer.Commit()
 	if err != nil {
 		panic(err)

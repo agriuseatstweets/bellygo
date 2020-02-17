@@ -30,8 +30,8 @@ func NewKafkaConsumer(topic string, brokers string, group string) KafkaConsumer 
 	return KafkaConsumer{c}
 }
 
-func (consumer KafkaConsumer) Consume (n int, timeout time.Duration, errs chan error) chan *TweetData {
-	messages := make(chan *TweetData)
+func (consumer KafkaConsumer) Consume (n int, timeout time.Duration, errs chan error) chan *BellyData {
+	messages := make(chan *BellyData)
 	c := consumer.Consumer
 
 	// runs until n messages consumed
@@ -46,7 +46,8 @@ func (consumer KafkaConsumer) Consume (n int, timeout time.Duration, errs chan e
 				break
 			}
 
-			dat, err := NewTweetData(msg.Value)
+			// TODO: make NewBellyData with msg.Key also
+			dat, err := NewBellyData(msg.Value)
 			if err != nil {
 				errs <- err
 				break
