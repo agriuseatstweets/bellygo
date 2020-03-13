@@ -42,6 +42,9 @@ func (consumer KafkaConsumer) Consume (n int, timeout time.Duration, errs chan e
 			msg, err := c.ReadMessage(timeout)
 
 			if err != nil {
+				if e, ok := err.(kafka.Error); ok && e.Code() == kafka.ErrTimedOut {
+					break
+				}
 				errs <- err
 				break
 			}
