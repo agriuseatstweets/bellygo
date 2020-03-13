@@ -10,6 +10,7 @@ import (
 	"github.com/caarlos0/env/v6"
 	"github.com/segmentio/ksuid"
 	"cloud.google.com/go/storage"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
 
@@ -142,6 +143,19 @@ func getConfig() Config {
 	return cfg
 }
 
+func handleCommitError(err error) bool {
+	if err == nil {
+		return true
+	}
+
+	if e, ok := err.(kafka.Error); ok && e.Code() == kafka.ErrNoOffset {
+		log.Print("Belly consumed no messages and is committing no messages")
+		return false
+	}
+
+	panic(err)
+}
+
 func main() {
 	cnf := getConfig()
 
@@ -154,10 +168,10 @@ func main() {
 	data := c.Consume(cnf.Size, cnf.KafkaPollTimeout, errs)
 
 	WriteData(bkt, data)
-	tp, err := c.Consumer.Commit()
-	if err != nil {
-		panic(err)
-	}
 
-	log.Printf("Committed topic partition: %v", tp)
+	tp, err := c.Consumer.Commit()
+	ok := handleCommitError(err)
+	if ok {
+		log.Printf("Committed topic partition: %v", tp)
+	}
 }
