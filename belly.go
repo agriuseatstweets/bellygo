@@ -1,41 +1,39 @@
 package main
 
 import (
-	"log"
-	"fmt"
-	"sync"
-	"time"
+	"cloud.google.com/go/storage"
 	"compress/gzip"
 	"context"
+	"fmt"
 	"github.com/caarlos0/env/v6"
-	"github.com/segmentio/ksuid"
-	"cloud.google.com/go/storage"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/segmentio/ksuid"
+	"log"
+	"sync"
+	"time"
 )
 
-
 func merge(cs ...<-chan error) <-chan error {
-    var wg sync.WaitGroup
-    out := make(chan error)
+	var wg sync.WaitGroup
+	out := make(chan error)
 
-    output := func(c <-chan error) {
-        for n := range c {
-            out <- n
-        }
-        wg.Done()
-    }
-    wg.Add(len(cs))
-    for _, c := range cs {
-        go output(c)
-    }
+	output := func(c <-chan error) {
+		for n := range c {
+			out <- n
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
 
-    go func() {
-        wg.Wait()
-        close(out)
-    }()
-    return out
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }
-
 
 type BellyWriter struct {
 	gz *gzip.Writer
@@ -43,7 +41,7 @@ type BellyWriter struct {
 }
 
 type WriteChan struct {
-	In chan<- *BellyData
+	In   chan<- *BellyData
 	Errs <-chan error
 }
 
@@ -68,6 +66,8 @@ func (t *BellyWriter) Close() error {
 
 func NewWriteChan(bkt *storage.BucketHandle, date string) *WriteChan {
 	filename := ksuid.New()
+
+	// TODO: add source (topic) as a partitioned column...?
 	object := fmt.Sprintf("datestamp=%v/%v.json.gz", date, filename)
 	gc := bkt.Object(object).NewWriter(context.Background())
 	gz := gzip.NewWriter(gc)
@@ -95,9 +95,8 @@ func NewWriteChan(bkt *storage.BucketHandle, date string) *WriteChan {
 	return &WriteChan{inch, errs}
 }
 
-
 func WriteData(bkt *storage.BucketHandle, data chan *BellyData) {
-	writers := make(map[string] *WriteChan)
+	writers := make(map[string]*WriteChan)
 
 	for d := range data {
 		w, ok := writers[d.Key]
@@ -113,26 +112,27 @@ func WriteData(bkt *storage.BucketHandle, data chan *BellyData) {
 	// close in chans and block
 	// until all the writer out chans close
 	// we ignore write errors in the out chans
-	outs := [] <-chan error{}
+	outs := []<-chan error{}
 	for _, w := range writers {
 		close(w.In)
 		outs = append(outs, w.Errs)
 	}
-	for _ = range merge(outs...) {}
+	for _ = range merge(outs...) {
+	}
 }
 
 func monitor(errs <-chan error) {
-	e := <- errs
+	e := <-errs
 	log.Fatalf("Belly failed with error: %v", e)
 }
 
 type Config struct {
-	Size int `env:"BELLY_SIZE,required"`
-	Location string `env:"BELLY_LOCATION,required"`
-	KafkaBrokers string `env:"KAFKA_BROKERS,required"`
+	Size             int           `env:"BELLY_SIZE,required"`
+	Location         string        `env:"BELLY_LOCATION,required"`
+	KafkaBrokers     string        `env:"KAFKA_BROKERS,required"`
 	KafkaPollTimeout time.Duration `env:"KAFKA_POLL_TIMEOUT,required"`
-	Topic string `env:"BELLY_TOPIC,required"`
-	Group string `env:"BELLY_GROUP,required"`
+	Topic            string        `env:"BELLY_TOPIC,required"`
+	Group            string        `env:"BELLY_GROUP,required"`
 }
 
 func getConfig() Config {
